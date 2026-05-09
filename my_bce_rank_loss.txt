@@ -1,0 +1,68 @@
+### 1. Loss arguments
+    parser.add_argument('--loss_fct', type=str, default='mse_mean',
+                        choices=['mse', 'mse_mean', 'mse_sum',
+                                 'kld', 'kld_mean', 'kld_sum',
+                                 'cosine', 'cosine_mean', 'cosine_sum',
+                                 'linear_cka', 'rbf_cka'],
+                        help='loss function; mse/kld/cosine are aliases for *_mean')
+    parser.add_argument('--loss_type', type=str, default='both_layerwise',
+                        help='type of loss. one of {both_all, both_layerwise, only2_layerwise, only2_all, only1}')
+    parser.add_argument('--loss_r_type', type=str, default='embedding_mse',
+                        choices=['embedding_mse', 'preference', 'preference_l2', 'bce_l2', 'rank_l2', 'bce_rank_l2', 'dist_l2', 'sorted_dist_l2'],
+                        help='forget-side loss for GNNDelete randomness objective')
+    parser.add_argument('--loss_r_margin', type=float, default=0.0,
+                        help='margin for preference loss: deleted edge score should be lower than negative edge score by this value')
+    parser.add_argument('--loss_r_beta', type=float, default=1.0,
+                        help='temperature scale for preference loss')
+
+### 2. BCE + Rank loss function
+
+    std_loss = (deleted_prob.std(unbiased=False) - negative_prob.std(unbiased=False)).pow(2)
+    return mean_loss + std_loss
+
+
+def kg_bce_rank_loss(model, z, df_edge_index, df_edge_type, dr_edge_index, dr_edge_type, margin=0.0, beta=1.0):
+    """Stable decoder-level forget loss for KG edges.
+
+    BCE directly pushes deleted triples to negative, while the light ranking
+    term makes deleted triples score below retained positive triples.  The
+    retained scores are detached so loss_r does not try to increase DR scores
+    and only updates the deletion layers through deleted-edge scores.
+    """
+    if df_edge_index.numel() == 0:
+        zero = z.sum() * 0
+        return zero, zero, zero
+
+    df_logits = model.decode(z, df_edge_index, df_edge_type)
+    bce_loss = F.binary_cross_entropy_with_logits(df_logits, torch.zeros_like(df_logits))
+
+    if dr_edge_index.numel() == 0:
+        zero = z.sum() * 0
+        return bce_loss, bce_loss, zero
+
+    num_rank = min(df_logits.numel(), dr_edge_index.size(1))
+    if num_rank == 0:
+        zero = z.sum() * 0
+        return bce_loss, bce_loss, zero
+
+    df_idx = torch.randperm(df_logits.numel(), device=df_logits.device)[:num_rank]
+    dr_idx = torch.randperm(dr_edge_index.size(1), device=dr_edge_index.device)[:num_rank]
+    dr_logits = model.decode(z, dr_edge_index[:, dr_idx], dr_edge_type[dr_idx]).detach()
+    rank_loss = F.softplus(beta * (df_logits[df_idx] - dr_logits + margin)).mean()
+
+    return bce_loss + rank_loss, bce_loss, rank_loss
+    
+
+### 3. BCE + Rank loss usage
+                elif self.args.loss_r_type == 'bce_rank_l2':
+                    dr_edge_index = batch.edge_index[:, batch.dr_mask]
+                    dr_edge_type = batch.edge_type[batch.dr_mask]
+                    dr_decoding_mask = dr_edge_type < self.args.num_edge_type
+                    dr_edge_index = dr_edge_index[:, dr_decoding_mask]
+                    dr_edge_type = dr_edge_type[dr_decoding_mask]
+
+                    loss_r1 = z1.sum() * 0 if decoding_edge_index.numel() == 0 else loss_fct(embed1, embed1_ori)
+                    loss_r2, loss_r2_bce, loss_r2_rank = kg_bce_rank_loss(
+                        model, z2, decoding_edge_index, decoding_edge_type,
+                        dr_edge_index, dr_edge_type,
+                        margin=self.args.loss_r_margin, beta=self.args.loss_r_beta)
