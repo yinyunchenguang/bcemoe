@@ -140,3 +140,44 @@
 | 23 | `checkpoint/WordNet18/rgcn/gnndelete/mse_mean-both_layerwise-0.75-non_connected-bce_rank_l2-0.0-1.0-relation_lora_moe-4-8-16-1.0-0.0-soft-1.0/out-0.5-42` |
 | 24 | `checkpoint/WordNet18/rgcn/original/42` |
 | 25 | `checkpoint/WordNet18/rgcn/retrain/out-0.5-42` |
+
+python delete_gnn.py \
+    --dataset WordNet18 \
+    --gnn rgcn \
+    --unlearning_model gnndelete \
+    --df out \
+    --df_size 0.5 \
+    --random_seed 42 \
+    --lr 1e-3 \
+    --epochs 50 \
+    --valid_freq 2 \
+    --loss_fct mse_mean \
+    --loss_type both_layerwise \
+    --alpha 0.0 \
+    --neg_sample_random non_connected \
+    --loss_r_type bce_rank_l2 \
+    --loss_r_margin 0.0 \
+    --loss_r_beta 1.0 \
+    --deletion_operator relation_lora_moe \
+    --del_moe_num_experts 4 \
+    --del_lora_rank 8 \
+    --del_gate_emb_dim 16 \
+    --del_lora_alpha 1.0 \
+    --del_lora_dropout 0.0 \
+    --del_gate_mode soft \
+    --del_gate_temperature 1.0
+
+
+export WANDB_MODE=offline
+  export WANDB_PROJECT=zitniklab-gnn-unlearning
+
+  python delete_gnn.py \
+    --dataset WordNet18 \
+    --gnn rgat \
+    --unlearning_model retrain \
+    --df out \
+    --df_size 0.5 \
+    --random_seed 42 \
+    --lr 1e-3 \
+    --epochs 2000 \
+    --valid_freq 500

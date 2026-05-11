@@ -57,7 +57,7 @@ def get_output(model, node_embedding, data):
 
     return output
 
-torch.autograd.set_detect_anomaly(True)
+torch.autograd.set_detect_anomaly(False)
 def main():
     args = parse_args()
     original_path = os.path.join(args.checkpoint_dir, args.dataset, args.gnn, 'original', str(args.random_seed))

@@ -234,9 +234,17 @@ class RetrainTrainer(Trainer):
 
 class KGRetrainTrainer(KGTrainer):
     def train(self, model, data, optimizer, args, logits_ori=None, attack_model_all=None, attack_model_sub=None):
+        """GraphSAINT mini-batch KG retraining after removing Df.
+
+        This matches the original RGAT/RGCN training mode used by KGTrainer:
+        each epoch trains on sampled subgraphs rather than the whole graph.
+        The only difference from original training is that message passing and
+        positive decoding edges are restricted to Dr via batch.dr_mask.
+        """
         model = model.to(device)
         start_time = time.time()
         best_metric = 0
+        best_epoch = -1
 
         # MI Attack before unlearning
         if attack_model_all is not None:
@@ -249,22 +257,24 @@ class KGRetrainTrainer(KGTrainer):
             self.trainer_log['mi_sucrate_sub_before'] = mi_sucrate_sub_before
 
         loader = GraphSAINTRandomWalkSampler(
-            data, batch_size=128, walk_length=2, num_steps=args.num_steps, 
+            data, batch_size=128, walk_length=2, num_steps=args.num_steps,
         )
         for epoch in trange(args.epochs, desc='Epoch'):
             model.train()
 
             epoch_loss = 0
+            epoch_time = 0
             for step, batch in enumerate(tqdm(loader, desc='Step', leave=False)):
+                step_start = time.time()
                 batch = batch.to(device)
 
-                # Message passing
+                # Message passing on retained edges in sampled subgraph.
                 edge_index = batch.edge_index[:, batch.dr_mask]
                 edge_type = batch.edge_type[batch.dr_mask]
                 z = model(batch.x, edge_index, edge_type)
 
-                # Positive and negative sample
-                decoding_mask = (edge_type < args.num_edge_type)       # Only select directed edges for link prediction
+                # Positive and negative samples: only original directed edges.
+                decoding_mask = edge_type < args.num_edge_type
                 decoding_edge_index = edge_index[:, decoding_mask]
                 decoding_edge_type = edge_type[decoding_mask]
 
@@ -276,8 +286,7 @@ class KGRetrainTrainer(KGTrainer):
                 neg_logits = model.decode(z, neg_edge_index, decoding_edge_type)
                 logits = torch.cat([pos_logits, neg_logits], dim=-1)
                 label = get_link_labels(decoding_edge_index, neg_edge_index)
-                # reg_loss = z.pow(2).mean() + model.W.pow(2).mean()
-                loss = F.binary_cross_entropy_with_logits(logits, label)# + 1e-2 * reg_loss
+                loss = F.binary_cross_entropy_with_logits(logits, label)
 
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
@@ -290,19 +299,19 @@ class KGRetrainTrainer(KGTrainer):
                     'train_loss': loss.item(),
                 }
                 wandb.log(log)
-                # msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
-                # tqdm.write(' | '.join(msg))
-
                 epoch_loss += loss.item()
+                epoch_time += time.time() - step_start
 
             if (epoch + 1) % args.valid_freq == 0:
                 valid_loss, dt_auc, dt_aup, df_auc, df_aup, df_logit, logit_all_pair, valid_log = self.eval(model, data, 'val')
+                valid_log['epoch'] = epoch
 
                 train_log = {
                     'epoch': epoch,
-                    'train_loss': epoch_loss / step
+                    'train_loss': epoch_loss / max(step + 1, 1),
+                    'epoch_time': epoch_time,
                 }
-                
+
                 for log in [train_log, valid_log]:
                     wandb.log(log)
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
@@ -332,8 +341,14 @@ class KGRetrainTrainer(KGTrainer):
         }
         torch.save(ckpt, os.path.join(args.checkpoint_dir, 'model_final.pt'))
 
-        print(f'Training finished. Best checkpoint at epoch = {best_epoch:04d}, best valid loss = {best_metric:.4f}')
+        if best_epoch < 0:
+            best_epoch = args.epochs - 1
+            torch.save(ckpt, os.path.join(args.checkpoint_dir, 'model_best.pt'))
+
+        print(f'Training finished. Best checkpoint at epoch = {best_epoch:04d}, best metric = {best_metric:.4f}')
 
         self.trainer_log['best_epoch'] = best_epoch
         self.trainer_log['best_metric'] = best_metric
-        self.trainer_log['training_time'] = np.mean([i['epoch_time'] for i in self.trainer_log['log'] if 'epoch_time' in i])
+        epoch_times = [i['epoch_time'] for i in self.trainer_log['log'] if 'epoch_time' in i]
+        if epoch_times:
+            self.trainer_log['training_time'] = np.mean(epoch_times)

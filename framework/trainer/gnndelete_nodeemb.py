@@ -279,7 +279,6 @@ class GNNDeleteNodeembTrainer(Trainer):
             embed2 = torch.cat([z2[pos_edge[0]], z2[pos_edge[1]]], dim=0)
             embed2_ori = torch.cat([z2_ori[neg_edge[0]], z2_ori[neg_edge[1]]], dim=0)
 
-            loss_r1 = loss_fct(embed1, embed1_ori)
             loss_r2 = loss_fct(embed2, embed2_ori)
 
             # Local causality
@@ -291,9 +290,9 @@ class GNNDeleteNodeembTrainer(Trainer):
             '''both_all, both_layerwise, only2_layerwise, only2_all, only1'''
             if self.args.loss_type == 'both_all':
                 loss_l = loss_l1 + loss_l2
-                loss_r = loss_r1 + loss_r2
+                loss_r = loss_r2
 
-                #### alpha * loss_r + (1 - alpha) * loss_l
+                #### alpha * loss_r2 + (1 - alpha) * loss_l
                 loss = self.args.alpha * loss_r + (1 - self.args.alpha) * loss_l
 
                 #### loss_r + lambda * loss_l
@@ -304,9 +303,9 @@ class GNNDeleteNodeembTrainer(Trainer):
             elif self.args.loss_type == 'both_layerwise':
                 #### alpha * loss_r + (1 - alpha) * loss_l
                 loss_l = loss_l1 + loss_l2
-                loss_r = loss_r1 + loss_r2
+                loss_r = loss_r2
 
-                loss1 = self.args.alpha * loss_r1 + (1 - self.args.alpha) * loss_l1
+                loss1 = (1 - self.args.alpha) * loss_l1
                 loss2 = self.args.alpha * loss_r2 + (1 - self.args.alpha) * loss_l2
                 # loss2 is computed from z2, which is computed from z1 and thus
                 # still depends on deletion1 parameters.  Do not step optimizer[0]
@@ -326,9 +325,7 @@ class GNNDeleteNodeembTrainer(Trainer):
 
                 #### loss_r + lambda * loss_l
                 # loss_l = loss_l1 + loss_l2
-                # loss_r = loss_r1 + loss_r2
 
-                # loss1 = loss_r1 + self.args.alpha * loss_l1
                 # loss1.backward(retain_graph=True)
                 # optimizer[0].step()
                 # optimizer[0].zero_grad()
@@ -342,7 +339,7 @@ class GNNDeleteNodeembTrainer(Trainer):
                 
             elif self.args.loss_type == 'only2_layerwise':
                 loss_l = loss_l1 + loss_l2
-                loss_r = loss_r1 + loss_r2
+                loss_r = loss_r2
 
                 optimizer[0].zero_grad()
 
@@ -370,9 +367,9 @@ class GNNDeleteNodeembTrainer(Trainer):
 
             elif self.args.loss_type == 'only1':
                 loss_l = loss_l1
-                loss_r = loss_r1
+                loss_r = z1.sum() * 0
 
-                loss = loss_l + self.args.alpha * loss_r
+                loss = loss_l
                 
                 loss.backward()
                 optimizer.step()
@@ -402,11 +399,10 @@ class GNNDeleteNodeembTrainer(Trainer):
                 train_log = {
                     'epoch': epoch,
                     'train_loss': loss.item(),
-                    'loss_r': loss_r.item(),
+                    'loss_r2': loss_r2.item(),
                     'loss_l': loss_l.item(),
                     'train_time': epoch_time,
                 }
-                
                 for log in [train_log, valid_log]:
                     wandb.log(log)
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
@@ -501,7 +497,6 @@ class GNNDeleteNodeembTrainer(Trainer):
                 embed2 = torch.cat([z2[pos_edge[0]], z2[pos_edge[1]]], dim=0)
                 embed2_ori = torch.cat([z2_ori[neg_edge[0]], z2_ori[neg_edge[1]]], dim=0)
 
-                loss_r1 = loss_fct(embed1, embed1_ori)
                 loss_r2 = loss_fct(embed2, embed2_ori)
 
                 # Local causality
@@ -511,9 +506,9 @@ class GNNDeleteNodeembTrainer(Trainer):
 
                 # Total loss
                 loss_l = loss_l1 + loss_l2
-                loss_r = loss_r1 + loss_r2
+                loss_r = loss_r2
 
-                loss1 = self.args.alpha * loss_r1 + (1 - self.args.alpha) * loss_l1
+                loss1 = (1 - self.args.alpha) * loss_l1
                 loss2 = self.args.alpha * loss_r2 + (1 - self.args.alpha) * loss_l2
                 # loss2 is computed from z2, which is computed from z1 and thus
                 # still depends on deletion1 parameters.  Do not step optimizer[0]
@@ -670,7 +665,6 @@ class GNNDeleteNodeClassificationTrainer(NodeClassificationTrainer):
             embed2 = torch.cat([z2[pos_edge[0]], z2[pos_edge[1]]], dim=0)
             embed2_ori = torch.cat([z2_ori[neg_edge[0]], z2_ori[neg_edge[1]]], dim=0)
 
-            loss_r1 = loss_fct(embed1, embed1_ori)
             loss_r2 = loss_fct(embed2, embed2_ori)
 
             # Local causality
@@ -681,9 +675,9 @@ class GNNDeleteNodeClassificationTrainer(NodeClassificationTrainer):
             # Total loss
             '''both_all, both_layerwise, only2_layerwise, only2_all, only1'''
             loss_l = loss_l1 + loss_l2
-            loss_r = loss_r1 + loss_r2
+            loss_r = loss_r2
 
-            loss1 = self.args.alpha * loss_r1 + (1 - self.args.alpha) * loss_l1
+            loss1 = (1 - self.args.alpha) * loss_l1
             loss2 = self.args.alpha * loss_r2 + (1 - self.args.alpha) * loss_l2
             # loss2 is computed from z2, which is computed from z1 and thus
             # still depends on deletion1 parameters.  Do not step optimizer[0]
@@ -722,11 +716,10 @@ class GNNDeleteNodeClassificationTrainer(NodeClassificationTrainer):
                 train_log = {
                     'epoch': epoch,
                     'train_loss': loss.item(),
-                    'loss_r': loss_r.item(),
+                    'loss_r2': loss_r2.item(),
                     'loss_l': loss_l.item(),
                     'train_time': epoch_time,
                 }
-                
                 for log in [train_log, valid_log]:
                     wandb.log(log)
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
@@ -877,20 +870,15 @@ class KGGNNDeleteNodeembTrainer(KGTrainer):
                 loss_r2_bce = None
                 loss_r2_rank = None
                 if self.args.loss_r_type == 'preference':
-                    loss_r1 = kg_preference_loss(
-                        model, z1, decoding_edge_index, neg_edge_index, decoding_edge_type,
-                        margin=self.args.loss_r_margin, beta=self.args.loss_r_beta, use_decoder=False)
                     loss_r2 = kg_preference_loss(
                         model, z2, decoding_edge_index, neg_edge_index, decoding_edge_type,
                         margin=self.args.loss_r_margin, beta=self.args.loss_r_beta, use_decoder=True)
                 elif self.args.loss_r_type == 'preference_l2':
-                    loss_r1 = loss_fct(embed1, embed1_ori)
                     loss_r2 = kg_preference_loss(
                         model, z2, decoding_edge_index, neg_edge_index, decoding_edge_type,
                         margin=self.args.loss_r_margin, beta=self.args.loss_r_beta, use_decoder=True)
                 elif self.args.loss_r_type == 'bce_l2':
                     deleted_logits = model.decode(z2, decoding_edge_index, decoding_edge_type)
-                    loss_r1 = loss_fct(embed1, embed1_ori)
                     loss_r2 = F.binary_cross_entropy_with_logits(
                         deleted_logits, torch.zeros_like(deleted_logits))
                 elif self.args.loss_r_type == 'rank_l2':
@@ -900,7 +888,6 @@ class KGGNNDeleteNodeembTrainer(KGTrainer):
                     dr_edge_index = dr_edge_index[:, dr_decoding_mask]
                     dr_edge_type = dr_edge_type[dr_decoding_mask]
 
-                    loss_r1 = z1.sum() * 0 if decoding_edge_index.numel() == 0 else loss_fct(embed1, embed1_ori)
                     _, loss_r2_bce, loss_r2_rank = kg_bce_rank_loss(
                         model, z2, decoding_edge_index, decoding_edge_type,
                         dr_edge_index, dr_edge_type,
@@ -913,23 +900,19 @@ class KGGNNDeleteNodeembTrainer(KGTrainer):
                     dr_edge_index = dr_edge_index[:, dr_decoding_mask]
                     dr_edge_type = dr_edge_type[dr_decoding_mask]
 
-                    loss_r1 = z1.sum() * 0 if decoding_edge_index.numel() == 0 else loss_fct(embed1, embed1_ori)
                     loss_r2, loss_r2_bce, loss_r2_rank = kg_bce_rank_loss(
                         model, z2, decoding_edge_index, decoding_edge_type,
                         dr_edge_index, dr_edge_type,
                         margin=self.args.loss_r_margin, beta=self.args.loss_r_beta)
                 elif self.args.loss_r_type == 'dist_l2':
-                    loss_r1 = loss_fct(embed1, embed1_ori)
                     loss_r2 = kg_distribution_loss(
                         model, z2, decoding_edge_index, neg_edge_index, decoding_edge_type,
                         mode='moment')
                 elif self.args.loss_r_type == 'sorted_dist_l2':
-                    loss_r1 = loss_fct(embed1, embed1_ori)
                     loss_r2 = kg_distribution_loss(
                         model, z2, decoding_edge_index, neg_edge_index, decoding_edge_type,
                         mode='sorted')
                 else:
-                    loss_r1 = loss_fct(embed1, embed1_ori)
                     loss_r2 = loss_fct(embed2, embed2_ori)
 
                 # Local causality
@@ -939,9 +922,9 @@ class KGGNNDeleteNodeembTrainer(KGTrainer):
 
                 # Loss
                 loss_l = loss_l1 + loss_l2
-                loss_r = loss_r1 + loss_r2
+                loss_r = loss_r2
 
-                loss1 = self.args.alpha * loss_r1 + (1 - self.args.alpha) * loss_l1
+                loss1 = (1 - self.args.alpha) * loss_l1
                 loss2 = self.args.alpha * loss_r2 + (1 - self.args.alpha) * loss_l2
                 # loss2 is computed from z2, which is computed from z1 and thus
                 # still depends on deletion1 parameters.  Do not step optimizer[0]
@@ -966,7 +949,7 @@ class KGGNNDeleteNodeembTrainer(KGTrainer):
                 step_log = {
                     'Epoch': epoch,
                     'train_loss': loss.item(),
-                    'loss_r': loss_r.item(),
+                    'loss_r2': loss_r2.item(),
                     'loss_l': loss_l.item(),
                     'train_time': epoch_time
                 }
@@ -984,10 +967,13 @@ class KGGNNDeleteNodeembTrainer(KGTrainer):
                 train_log = {
                     'epoch': epoch,
                     'train_loss': loss.item(),
-                    'loss_r': loss_r.item(),
+                    'loss_r2': loss_r2.item(),
                     'loss_l': loss_l.item(),
                     'train_time': epoch_time,
                 }
+                if loss_r2_bce is not None:
+                    train_log['loss_r2_bce'] = loss_r2_bce.item()
+                    train_log['loss_r2_rank'] = loss_r2_rank.item()
                 
                 for log in [train_log, valid_log]:
                     wandb.log(log)
