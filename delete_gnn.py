@@ -1,7 +1,6 @@
 import os
 import copy
 import json
-import wandb
 import pickle
 import argparse
 import torch
@@ -73,6 +72,8 @@ def main():
             loss_tag.append(args.deletion_operator)
             if args.deletion_operator in ['scgu', 'scgu_lowrank', 'lowrank']:
                 loss_tag.extend([args.scgu_rank, args.scgu_init])
+            elif args.deletion_operator == 'scgu_moe':
+                loss_tag.extend([args.scgu_rank, args.scgu_init, args.del_moe_num_experts, args.del_gate_emb_dim, args.del_gate_mode])
             else:
                 loss_tag.extend([
                     args.del_moe_num_experts,
@@ -102,7 +103,6 @@ def main():
         args.in_dim = dataset.num_features
 
     print('Training args', args)
-    wandb.init(config=args)
 
     # Df and Dr
     assert args.df != 'none'
@@ -272,8 +272,6 @@ def main():
         
         optimizer = torch.optim.Adam(parameters_to_optimize, lr=args.lr)#, weight_decay=args.weight_decay)
     
-    wandb.watch(model, log_freq=100)
-
     # MI attack model
     attack_model_all = None
     # attack_model_all = MLPAttacker(args)

@@ -1,6 +1,5 @@
 import os
 import time
-import wandb
 from tqdm import tqdm, trange
 import torch
 import torch.nn as nn
@@ -80,7 +79,7 @@ class GradientAscentTrainer(Trainer):
                 'train_loss': loss.item(),
                 'train_time': epoch_time
             }
-            wandb.log(step_log)
+
             msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in step_log.items()]
             tqdm.write(' | '.join(msg))
 
@@ -95,7 +94,7 @@ class GradientAscentTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
                     self.trainer_log['log'].append(log)
@@ -180,7 +179,7 @@ class GradientAscentTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
                     self.trainer_log['log'].append(log)
@@ -256,7 +255,7 @@ class KGGradientAscentTrainer(KGTrainer):
                     'step': step,
                     'train_loss': loss.item(),
                 }
-                wandb.log(log)
+
                 # msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                 # tqdm.write(' | '.join(msg))
 
@@ -271,7 +270,7 @@ class KGGradientAscentTrainer(KGTrainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
 

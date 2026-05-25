@@ -1,6 +1,5 @@
 import os
 import time
-import wandb
 from tqdm import tqdm, trange
 import torch
 import torch.nn as nn
@@ -159,7 +158,7 @@ class GNNDeleteEmbeddingDistanceTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
                     self.trainer_log['log'].append(log)
@@ -296,7 +295,7 @@ class GNNDeleteEmbeddingDistanceTrainer(Trainer):
                     'valid_dt_auc': auc,
                     'valid_dt_aup': aup,
                 }
-                wandb.log(log)
+
                 msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                 tqdm.write(' | '.join(msg))
 

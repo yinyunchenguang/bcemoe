@@ -257,6 +257,72 @@ class RelationLoRAMoEDeletionLayer(nn.Module):
         return new_rep
 
 
+class SCGUMoEDeletionLayerKG(nn.Module):
+    """SCGU + MoE: relation-gated mixture of SCGU expert weights.
+
+    Each expert e has its own B_e; the deletion weight is:
+        W = sum_e g_e(r) * (I + A B_e)
+    """
+
+    def __init__(self, dim, mask, num_relations, rank=16, num_experts=4,
+                 gate_emb_dim=16, gate_mode='soft', gate_temperature=1.0,
+                 init_strategy='random'):
+        super().__init__()
+        self.dim = dim
+        self.mask = mask
+        self.num_relations = num_relations
+        self.gate_mode = gate_mode
+        self.gate_temperature = gate_temperature
+
+        self.del_A = nn.Parameter(torch.randn(dim, rank) * 0.1)
+        if init_strategy == 'zero':
+            self.del_B = nn.Parameter(torch.zeros(num_experts, rank, dim))
+        else:
+            self.del_B = nn.Parameter(torch.randn(num_experts, rank, dim) * 0.1)
+
+        self.del_relation_emb = nn.Embedding(num_relations, gate_emb_dim)
+        self.del_gate = nn.Linear(gate_emb_dim, num_experts)
+        nn.init.zeros_(self.del_gate.bias)
+
+    def _relation_gate(self, delete_edge_type, device):
+        if delete_edge_type is None:
+            rel = torch.arange(self.num_relations, device=device)
+        else:
+            rel = delete_edge_type.to(device).view(-1)
+            if rel.numel() == 0:
+                rel = torch.arange(self.num_relations, device=device)
+            rel = rel.remainder(self.num_relations).long()
+        logits = self.del_gate(self.del_relation_emb(rel))
+        probs = F.softmax(logits / self.gate_temperature, dim=-1)
+        if self.gate_mode == 'hard':
+            idx = probs.argmax(dim=-1, keepdim=True)
+            hard = torch.zeros_like(probs).scatter_(-1, idx, 1.0)
+            probs = hard - probs.detach() + probs
+        return probs.mean(dim=0)  # (num_experts,)
+
+    def forward(self, x, mask=None, delete_edge_type=None):
+        if mask is None:
+            mask = self.mask
+        if mask is None:
+            return x
+        new_rep = x.clone()
+        local_x = new_rep[mask]
+        if local_x.numel() == 0:
+            return new_rep
+
+        gate = self._relation_gate(delete_edge_type, x.device)
+        A = self.del_A.to(dtype=x.dtype)
+        B = self.del_B.to(dtype=x.dtype)  # (E, r, d)
+
+        # AB[e] = A @ B[e]: (d,r) x (r,d) -> (d,d), stacked: (E, d, d)
+        AB = torch.matmul(A.unsqueeze(0), B)  # (E, d, d)
+        identity = torch.eye(self.dim, device=x.device, dtype=x.dtype)
+        # gate-weighted sum of (I + A B_e)
+        deletion_weight = identity + torch.einsum('e,eij->ij', gate, AB)
+        new_rep[mask] = torch.matmul(local_x, deletion_weight)
+        return new_rep
+
+
 def build_kg_deletion_layer(args, dim, mask, num_edge_type):
     """Factory for pluggable KG deletion operators."""
     deletion_operator = getattr(args, 'deletion_operator', 'original')
@@ -282,6 +348,18 @@ def build_kg_deletion_layer(args, dim, mask, num_edge_type):
             dropout=getattr(args, 'del_lora_dropout', 0.0),
             gate_mode=getattr(args, 'del_gate_mode', 'soft'),
             gate_temperature=getattr(args, 'del_gate_temperature', 1.0),
+        )
+    if deletion_operator == 'scgu_moe':
+        return SCGUMoEDeletionLayerKG(
+            dim=dim,
+            mask=mask,
+            num_relations=num_edge_type,
+            rank=getattr(args, 'scgu_rank', 16),
+            num_experts=getattr(args, 'del_moe_num_experts', 4),
+            gate_emb_dim=getattr(args, 'del_gate_emb_dim', 16),
+            gate_mode=getattr(args, 'del_gate_mode', 'soft'),
+            gate_temperature=getattr(args, 'del_gate_temperature', 1.0),
+            init_strategy=getattr(args, 'scgu_init', 'random'),
         )
     raise ValueError(f'Unknown deletion_operator: {deletion_operator}')
 

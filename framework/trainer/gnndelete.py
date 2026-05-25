@@ -1,6 +1,5 @@
 import os
 import time
-import wandb
 from tqdm import tqdm, trange
 import torch
 import torch.nn as nn
@@ -268,7 +267,7 @@ class GNNDeleteTrainer(Trainer):
                 'loss_l': loss_l.item(),
                 'train_time': epoch_time
             }
-            wandb.log(step_log)
+
             msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in step_log.items()]
             tqdm.write(' | '.join(msg))
 
@@ -285,7 +284,7 @@ class GNNDeleteTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
                     self.trainer_log['log'].append(log)
@@ -425,7 +424,7 @@ class GNNDeleteTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
                     self.trainer_log['log'].append(log)

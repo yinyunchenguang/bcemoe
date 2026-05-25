@@ -1,7 +1,6 @@
 import os
 import time
 import json
-import wandb
 import numpy as np
 import torch
 import torch.nn as nn
@@ -107,7 +106,7 @@ class Trainer:
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
 
@@ -176,7 +175,7 @@ class Trainer:
                     'step': step,
                     'train_loss': loss.item(),
                 }
-                wandb.log(log)
+
                 msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                 tqdm.write(' | '.join(msg))
 
@@ -191,7 +190,7 @@ class Trainer:
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
 
@@ -442,7 +441,7 @@ class KGTrainer(Trainer):
                     'step': step,
                     'train_loss': loss.item(),
                 }
-                wandb.log(log)
+
                 # msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                 # tqdm.write(' | '.join(msg))
 
@@ -459,7 +458,7 @@ class KGTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
 
@@ -658,7 +657,7 @@ class KGTrainer(Trainer):
                 'epoch': epoch,
                 'train_loss': loss.item(),
             }
-            wandb.log(log)
+
             msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
             tqdm.write(' | '.join(msg))
 
@@ -671,7 +670,7 @@ class KGTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
 
@@ -732,7 +731,7 @@ class NodeClassificationTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
 
@@ -910,7 +909,7 @@ class GraphTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
 

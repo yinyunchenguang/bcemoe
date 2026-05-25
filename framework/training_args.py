@@ -6,6 +6,10 @@ num_edge_type_mapping = {
     'FB15k-237': 237,
     'WordNet18': 18,
     'WordNet18RR': 11,
+    'YAGO3-10': 37,
+    'codex-s': 42,
+    'codex-m': 51,
+    'codex-l': 69,
     'ogbl-biokg': 51,
     # DBLP heterogeneous graph from node.dat/link.dat: 6 directed relation types.
     'DBLP': 6
@@ -53,7 +57,7 @@ def parse_args():
                         help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', 
                         help='optimizer to use')
-    parser.add_argument('--epochs', type=int, default=3000, 
+    parser.add_argument('--epochs', type=int, default=3000,
                         help='number of epochs to train')
     parser.add_argument('--valid_freq', type=int, default=100,
                         help='# of epochs to do validation')
@@ -81,7 +85,7 @@ def parse_args():
 
     # Pluggable deletion operator for KG/heterogeneous GNNDelete.
     parser.add_argument('--deletion_operator', type=str, default='original',
-                        choices=['original', 'scgu', 'scgu_lowrank', 'lowrank', 'relation_lora_moe', 'lora_moe'],
+                        choices=['original', 'scgu', 'scgu_lowrank', 'lowrank', 'relation_lora_moe', 'lora_moe', 'scgu_moe'],
                         help='deletion operator: original shared matrix, SCGU low-rank subspace operator, or relation-driven LoRA-MoE')
     parser.add_argument('--scgu_rank', type=int, default=16,
                         help='rank k of the SCGU low-rank deletion subspace')

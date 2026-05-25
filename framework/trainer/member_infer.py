@@ -1,6 +1,5 @@
 import os
 import json
-import wandb
 import numpy as np
 import torch
 import torch.nn as nn
@@ -67,7 +66,7 @@ class MIAttackTrainer(Trainer):
                     'shadow_valid_aup': aup, 
                     'shadow_df_logit': df_logit
                 }
-                wandb.log(log)
+
                 self.trainer_log['shadow_log'].append(log)
                 
                 msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
@@ -112,7 +111,7 @@ class MIAttackTrainer(Trainer):
             f'{stage}_aup': aup,
             f'{stage}_df_logit': df_logit,
         }
-        wandb.log(log)
+
         msg = [f'{i}: {j:.4f}' if isinstance(j, (np.floating, float)) else f'{i}: {j:>4d}' for i, j in log.items()]
         tqdm.write(' | '.join(msg))
 
@@ -144,7 +143,7 @@ class MIAttackTrainer(Trainer):
                 'attack_valid_acc': valid_acc, 
                 'attack_valid_auc': valid_auc, 
                 'attack_valid_f1': valid_f1}
-            wandb.log(log)
+
             self.trainer_log['attack_log'].append(log)
 
             msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]

@@ -1,6 +1,5 @@
 import os
 import time
-import wandb
 from tqdm import tqdm, trange
 import torch
 import torch.nn.functional as F
@@ -69,7 +68,7 @@ class DtdTrainer(Trainer):
                 'Epoch': epoch,
                 'train_loss': loss.item(),
             }
-            wandb.log(log)
+
             msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
             tqdm.write(' | '.join(msg))
 

@@ -1,6 +1,5 @@
 import os
 import time
-import wandb
 from tqdm import tqdm, trange
 import numpy as np
 import torch
@@ -85,7 +84,7 @@ class RetrainTrainer(Trainer):
                 'train_loss': loss.item(),
                 'train_time': epoch_time
             }
-            wandb.log(step_log)
+
             msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in step_log.items()]
             tqdm.write(' | '.join(msg))
 
@@ -100,7 +99,7 @@ class RetrainTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
                     self.trainer_log['log'].append(log)
@@ -179,7 +178,7 @@ class RetrainTrainer(Trainer):
                     'step': step,
                     'train_loss': loss.item(),
                 }
-                wandb.log(step_log)
+
                 msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in step_log.items()]
                 tqdm.write(' | '.join(msg))
 
@@ -199,7 +198,7 @@ class RetrainTrainer(Trainer):
                 }
                 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
                     self.trainer_log['log'].append(log)
@@ -298,7 +297,7 @@ class KGRetrainTrainer(KGTrainer):
                     'step': step,
                     'train_loss': loss.item(),
                 }
-                wandb.log(log)
+
                 epoch_loss += loss.item()
                 epoch_time += time.time() - step_start
 
@@ -313,7 +312,7 @@ class KGRetrainTrainer(KGTrainer):
                 }
 
                 for log in [train_log, valid_log]:
-                    wandb.log(log)
+
                     msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in log.items()]
                     tqdm.write(' | '.join(msg))
 
