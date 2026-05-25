@@ -82,15 +82,28 @@ def verification_error(model1, model2):
 
 @torch.no_grad()
 def member_infer_attack(target_model, attack_model, data, logits=None):
-    '''Membership inference attack'''
+    '''Membership inference attack. Works for both graph and KG models.'''
+    dev = next(target_model.parameters()).device
+    is_kg = hasattr(data, 'directed_df_edge_type')
 
-    edge = data.train_pos_edge_index[:, data.df_mask]
-    z = target_model(data.x, data.train_pos_edge_index[:, data.dr_mask])
-    feature1 = target_model.decode(z, edge).sigmoid()
+    if is_kg:
+        df_edge_index = data.directed_df_edge_index.to(dev)
+        df_edge_type = data.directed_df_edge_type.to(dev)
+        z = target_model(
+            data.x.to(dev),
+            data.edge_index[:, data.dr_mask].to(dev),
+            data.edge_type[data.dr_mask].to(dev))
+        feature1 = target_model.decode(z, df_edge_index, df_edge_type).sigmoid()
+    else:
+        edge = data.train_pos_edge_index[:, data.df_mask].to(dev)
+        z = target_model(
+            data.x.to(dev),
+            data.train_pos_edge_index[:, data.dr_mask].to(dev))
+        feature1 = target_model.decode(z, edge).sigmoid()
+
     feature0 = 1 - feature1
-    feature = torch.stack([feature0, feature1], dim=1)
-    # feature = torch.cat([z[edge[0]], z[edge][1]], dim=-1)
-    logits = attack_model(feature)
+    feature = torch.stack([feature0, feature1], dim=1).cpu()
+    logits = attack_model(feature.to(next(attack_model.parameters()).device))
     _, pred = torch.max(logits, 1)
     suc_rate = 1 - pred.float().mean()
 

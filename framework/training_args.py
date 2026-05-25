@@ -82,6 +82,8 @@ def parse_args():
                         help='margin for preference loss: deleted edge score should be lower than negative edge score by this value')
     parser.add_argument('--loss_r_beta', type=float, default=1.0,
                         help='temperature scale for preference loss')
+    parser.add_argument('--rank_same_relation', action='store_true', default=False,
+                        help='rank loss only compares deleted edges against retained edges of the same relation type')
 
     # Pluggable deletion operator for KG/heterogeneous GNNDelete.
     parser.add_argument('--deletion_operator', type=str, default='original',
@@ -182,12 +184,11 @@ def parse_args():
             set_epochs(600)
             args.valid_freq = 100
         if args.gnn in ['rgcn', 'rgat']:
+            args.epochs = 50
             if args.dataset == 'WordNet18':
-                set_epochs(50)
                 args.valid_freq = 2
                 args.batch_size = 1024
             if args.dataset == 'ogbl-biokg':
-                set_epochs(50)
                 args.valid_freq = 10
                 args.batch_size = 64
 

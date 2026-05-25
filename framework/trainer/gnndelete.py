@@ -268,9 +268,6 @@ class GNNDeleteTrainer(Trainer):
                 'train_time': epoch_time
             }
 
-            msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in step_log.items()]
-            tqdm.write(' | '.join(msg))
-
             if (epoch + 1) % self.args.valid_freq == 0:
                 valid_loss, dt_auc, dt_aup, df_auc, df_aup, df_logit, logit_all_pair, valid_log = self.eval(model, data, 'val')
                 valid_log['epoch'] = epoch

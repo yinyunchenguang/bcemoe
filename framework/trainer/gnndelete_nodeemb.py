@@ -141,13 +141,17 @@ def kg_distribution_loss(model, z, pos_edge_index, neg_edge_index, edge_type, mo
     return mean_loss + std_loss
 
 
-def kg_bce_rank_loss(model, z, df_edge_index, df_edge_type, dr_edge_index, dr_edge_type, margin=0.0, beta=1.0):
+def kg_bce_rank_loss(model, z, df_edge_index, df_edge_type, dr_edge_index, dr_edge_type, margin=0.0, beta=1.0, same_relation=False):
     """Stable decoder-level forget loss for KG edges.
 
     BCE directly pushes deleted triples to negative, while the light ranking
     term makes deleted triples score below retained positive triples.  The
     retained scores are detached so loss_r does not try to increase DR scores
     and only updates the deletion layers through deleted-edge scores.
+
+    If same_relation=True, rank loss only compares against retained edges of
+    the same relation type. Falls back to all dr edges when same-relation
+    candidates are fewer than num_df.
     """
     if df_edge_index.numel() == 0:
         zero = z.sum() * 0
@@ -165,8 +169,22 @@ def kg_bce_rank_loss(model, z, df_edge_index, df_edge_type, dr_edge_index, dr_ed
         zero = z.sum() * 0
         return bce_loss, bce_loss, zero
 
+    if same_relation:
+        # collect dr indices that share any relation type with df
+        df_rels = df_edge_type.unique()
+        same_rel_mask = torch.isin(dr_edge_type, df_rels)
+        if same_rel_mask.sum() >= num_rank:
+            # enough same-relation dr edges: sample from them
+            same_rel_idx = same_rel_mask.nonzero(as_tuple=True)[0]
+            perm = torch.randperm(same_rel_idx.numel(), device=dr_edge_index.device)[:num_rank]
+            dr_idx = same_rel_idx[perm]
+        else:
+            # fallback: not enough same-relation edges, use all dr
+            dr_idx = torch.randperm(dr_edge_index.size(1), device=dr_edge_index.device)[:num_rank]
+    else:
+        dr_idx = torch.randperm(dr_edge_index.size(1), device=dr_edge_index.device)[:num_rank]
+
     df_idx = torch.randperm(df_logits.numel(), device=df_logits.device)[:num_rank]
-    dr_idx = torch.randperm(dr_edge_index.size(1), device=dr_edge_index.device)[:num_rank]
     dr_logits = model.decode(z, dr_edge_index[:, dr_idx], dr_edge_type[dr_idx]).detach()
     rank_loss = F.softplus(beta * (df_logits[df_idx] - dr_logits + margin)).mean()
 
@@ -388,9 +406,6 @@ class GNNDeleteNodeembTrainer(Trainer):
                 'train_time': epoch_time
             }
 
-            msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in step_log.items()]
-            tqdm.write(' | '.join(msg))
-
             if (epoch + 1) % self.args.valid_freq == 0:
                 valid_loss, dt_auc, dt_aup, df_auc, df_aup, df_logit, logit_all_pair, valid_log = self.eval(model, data, 'val')
                 valid_log['epoch'] = epoch
@@ -538,9 +553,6 @@ class GNNDeleteNodeembTrainer(Trainer):
                     'train_loss_r': loss_r.item(),
                     'train_time': end_time - start_time
                 }
-
-                msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in step_log.items()]
-                tqdm.write(' | '.join(msg))
 
             if (epoch+1) % args.valid_freq == 0:
                 valid_loss, dt_auc, dt_aup, df_auc, df_aup, df_logit, logit_all_pair, valid_log = self.eval(model, data, 'val')
@@ -704,9 +716,6 @@ class GNNDeleteNodeClassificationTrainer(NodeClassificationTrainer):
                 'loss_l': loss_l.item(),
                 'train_time': epoch_time
             }
-
-            msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in step_log.items()]
-            tqdm.write(' | '.join(msg))
 
             if (epoch + 1) % self.args.valid_freq == 0:
                 valid_loss, dt_acc, dt_f1, valid_log = self.eval(model, data, 'val')
@@ -890,7 +899,8 @@ class KGGNNDeleteNodeembTrainer(KGTrainer):
                     _, loss_r2_bce, loss_r2_rank = kg_bce_rank_loss(
                         model, z2, decoding_edge_index, decoding_edge_type,
                         dr_edge_index, dr_edge_type,
-                        margin=self.args.loss_r_margin, beta=self.args.loss_r_beta)
+                        margin=self.args.loss_r_margin, beta=self.args.loss_r_beta,
+                        same_relation=getattr(self.args, 'rank_same_relation', False))
                     loss_r2 = loss_r2_rank
                 elif self.args.loss_r_type == 'bce_rank_l2':
                     dr_edge_index = batch.edge_index[:, batch.dr_mask]
@@ -902,7 +912,8 @@ class KGGNNDeleteNodeembTrainer(KGTrainer):
                     loss_r2, loss_r2_bce, loss_r2_rank = kg_bce_rank_loss(
                         model, z2, decoding_edge_index, decoding_edge_type,
                         dr_edge_index, dr_edge_type,
-                        margin=self.args.loss_r_margin, beta=self.args.loss_r_beta)
+                        margin=self.args.loss_r_margin, beta=self.args.loss_r_beta,
+                        same_relation=getattr(self.args, 'rank_same_relation', False))
                 elif self.args.loss_r_type == 'dist_l2':
                     loss_r2 = kg_distribution_loss(
                         model, z2, decoding_edge_index, neg_edge_index, decoding_edge_type,
@@ -955,9 +966,6 @@ class KGGNNDeleteNodeembTrainer(KGTrainer):
                 if loss_r2_bce is not None:
                     step_log['loss_r2_bce'] = loss_r2_bce.item()
                     step_log['loss_r2_rank'] = loss_r2_rank.item()
-
-                msg = [f'{i}: {j:>4d}' if isinstance(j, int) else f'{i}: {j:.4f}' for i, j in step_log.items()]
-                tqdm.write(' | '.join(msg))
 
             if (epoch + 1) % self.args.valid_freq == 0:
                 valid_loss, dt_auc, dt_aup, df_auc, df_aup, df_logit, logit_all_pair, valid_log = self.eval(model, data, 'val')

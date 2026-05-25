@@ -60,8 +60,8 @@ torch.autograd.set_detect_anomaly(False)
 def main():
     args = parse_args()
     original_path = os.path.join(args.checkpoint_dir, args.dataset, args.gnn, 'original', str(args.random_seed))
-    attack_path_all = os.path.join(args.checkpoint_dir, args.dataset, 'member_infer_all', str(args.random_seed))
-    attack_path_sub = os.path.join(args.checkpoint_dir, args.dataset, 'member_infer_sub', str(args.random_seed))
+    attack_path_all = os.path.join(args.checkpoint_dir, args.dataset, args.gnn, 'member_infer_all', str(args.random_seed))
+    attack_path_sub = os.path.join(args.checkpoint_dir, args.dataset, args.gnn, 'member_infer_sub', str(args.random_seed))
     seed_everything(args.random_seed)
 
     if 'gnndelete' in args.unlearning_model:
@@ -272,18 +272,22 @@ def main():
         
         optimizer = torch.optim.Adam(parameters_to_optimize, lr=args.lr)#, weight_decay=args.weight_decay)
     
-    # MI attack model
+    # MI attack model — auto-load if checkpoints exist (run train_mi.py first)
     attack_model_all = None
-    # attack_model_all = MLPAttacker(args)
-    # attack_ckpt = torch.load(os.path.join(attack_path_all, 'attack_model_best.pt'))
-    # attack_model_all.load_state_dict(attack_ckpt['model_state'])
-    # attack_model_all = attack_model_all.to(device)
-
     attack_model_sub = None
-    # attack_model_sub = MLPAttacker(args)
-    # attack_ckpt = torch.load(os.path.join(attack_path_sub, 'attack_model_best.pt'))
-    # attack_model_sub.load_state_dict(attack_ckpt['model_state'])
-    # attack_model_sub = attack_model_sub.to(device)
+    if MLPAttacker is not None:
+        ckpt_all = os.path.join(attack_path_all, 'attack_model_best.pt')
+        ckpt_sub = os.path.join(attack_path_sub, 'attack_model_best.pt')
+        if os.path.exists(ckpt_all):
+            attack_model_all = MLPAttacker(args)
+            attack_model_all.load_state_dict(torch.load(ckpt_all, map_location=device)['model_state'])
+            attack_model_all = attack_model_all.to(device)
+            print(f'Loaded MI attack model (all) from {ckpt_all}')
+        if os.path.exists(ckpt_sub):
+            attack_model_sub = MLPAttacker(args)
+            attack_model_sub.load_state_dict(torch.load(ckpt_sub, map_location=device)['model_state'])
+            attack_model_sub = attack_model_sub.to(device)
+            print(f'Loaded MI attack model (sub) from {ckpt_sub}')
 
     # Train
     trainer = get_trainer(args)
